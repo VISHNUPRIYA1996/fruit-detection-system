@@ -1,0 +1,133 @@
+1 network_structure/utils.py
+2
+3 import tensorflow as tf
+4
+5
+6 # perform data augmentation on images
+7 # add random hue and saturation
+8 # randomly flip the image vertically and horizontally
+9 # converts the image from RGB to HSV and
+10 # adds a 4th channel to the HSV ones that contains the
+image in gray scale
+11 def augment_image(image):
+12 image = tf.image.convert_image_dtype(image , tf.
+float32)
+13 image = tf.image.random_hue(image , 0.02)
+14 image = tf.image.random_saturation(image , 0.9,
+1.2)
+15 image = tf.image.random_flip_left_right(image)
+16 image = tf.image.random_flip_up_down(image)
+17 return build_hsv_grayscale_image(image)
+18
+19
+33
+20 # convert the image to HSV and add the gray scale
+channel
+21 def build_hsv_grayscale_image(image):
+22 image = tf.image.convert_image_dtype(image , tf.
+float32)
+23 gray_image = tf.image.rgb_to_grayscale(image)
+24 image = tf.image.rgb_to_hsv(image)
+25 rez = tf.concat([image , gray_image], 2)
+26 return rez
+27
+28
+29 def parse_single_example(serialized_example):
+30 features = tf.parse_single_example(
+31 serialized_example ,
+32 features={
+33 ’image_raw ’: tf.FixedLenFeature([], tf.
+string),
+34 ’label ’: tf.FixedLenFeature([], tf.int64),
+35 ’height ’: tf.FixedLenFeature([], tf.int64)
+,
+36 ’width ’: tf.FixedLenFeature([], tf.int64)
+37 }
+38 )
+39 image = tf.image.decode_jpeg(features[’image_raw ’
+], channels=3)
+40 image = tf.reshape(image , [100 , 100, 3])
+41 label = tf.cast(features[’label ’], tf.int32)
+42 return image , label
+43
+44
+45 def conv(input_tensor , name , kernel_width ,
+kernel_height , num_out_activation_maps ,
+stride_horizontal=1, stride_vertical=1,
+activation_fn=tf.nn.relu):
+46 prev_layer_output = input_tensor.get_shape()[ -1].
+value
+47 with tf.variable_scope(name):
+48 weights = tf.get_variable(’weights ’, [
+34
+kernel_height , kernel_width ,
+prev_layer_output , num_out_activation_maps
+], tf.float32 ,
+49 tf.
+truncated_normal_initializer
+(stddev=5e-2,
+dtype=tf.float32)
+)
+50 biases = tf.get_variable("bias", [
+num_out_activation_maps], tf.float32 , tf.
+constant_initializer (0.0))
+51 conv_layer = tf.nn.conv2d(input_tensor ,
+weights , (1, stride_horizontal ,
+stride_vertical , 1), padding=’SAME ’)
+52 activation = activation_fn(tf.nn.bias_add(
+conv_layer , biases), name=name)
+53 return activation
+54
+55
+56 def fully_connected(input_tensor , name , output_neurons
+, activation_fn=tf.nn.relu):
+57 n_in = input_tensor.get_shape()[ -1].value
+58 with tf.variable_scope(name):
+59 weights = tf.get_variable(’weights ’, [n_in ,
+output_neurons], tf.float32 ,
+60 initializer=tf.
+truncated_normal_initializer
+(stddev=5e-2,
+dtype=tf.float32)
+)
+61 biases = tf.get_variable("bias", [
+output_neurons], tf.float32 , tf.
+constant_initializer (0.0))
+62 logits = tf.nn.bias_add(tf.matmul(input_tensor
+, weights), biases , name=name)
+63 if activation_fn is None:
+64 return logits
+65 return activation_fn(logits)
+35
+66
+67
+68 def max_pool(input_tensor , name , kernel_height ,
+kernel_width , stride_horizontal , stride_vertical):
+69 return tf.nn.max_pool(input_tensor ,
+70 ksize=[1, kernel_height ,
+kernel_width , 1],
+71 strides=[1,
+stride_horizontal ,
+stride_vertical , 1],
+72 padding=’VALID ’,
+73 name=name)
+74
+75
+76 def loss(logits , onehot_labels):
+77 xentropy = tf.nn.softmax_cross_entropy_with_logits
+(logits=logits , labels=onehot_labels , name=’
+xentropy ’)
+78 loss = tf.reduce_mean(xentropy , name=’loss ’)
+79 return loss
+80
+81
+82 def _int64_feature(value):
+83 if not isinstance(value , list):
+84 value = [value]
+85 return tf.train.Feature(int64_list=tf.train.
+Int64List(value=value))
+86
+87
+88 def _bytes_feature(value):
+89 return tf.train.Feature(bytes_list=tf.train.
+BytesList(value=[value]))
