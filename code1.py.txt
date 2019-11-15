@@ -1,0 +1,27 @@
+1 utils/constants.py
+2 import os
+3
+4 # needs to be changed according to the location of the
+project
+5 root_dir = ’C:\\ root_directory \\’
+6 data_dir = root_dir + ’\\ data \\’
+7 fruit_models_dir = root_dir + ’\\ fruit_models \\’
+8 labels_file = root_dir + ’\\ utils \\ labels ’
+9
+10 # change this to the path of the folders that hold the
+images
+11 training_images_dir = ’\\Fruit -Images -Dataset \\
+Training ’
+31
+12 test_images_dir = ’\\Fruit -Images -Dataset \\ Test ’
+13
+14 # number of classes: number of fruit classes + 1
+resulted due to the build_image_data.py script that
+leaves the first class as a background class
+15 # using the labels file that is also used in the
+build_image_data.py
+16 with open(labels_file) as f:
+17 labels = f.readlines()
+18 num_classes = len(labels) + 1
+19 number_train_images = \trainingImageCount
+20 number_test_images = \testImageCount
