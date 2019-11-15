@@ -1,0 +1,45 @@
+
+1 with tf.Session() as sess:
+2 image_path = FLAGS.image_path
+3 image_reader = tf.WholeFileReader()
+
+4 # restore the trained model from the saved
+checkpoint; provide the path to the meta file
+
+5 saver = tf.train.import_meta_graph(constants.
+fruit_models_dir + ’model.ckpt.meta ’)
+9 # provide the path to the folder containing the
+checkpoints
+0 saver.restore(sess , tf.train.latest_checkpoint(
+constants.fruit_models_dir))
+1 graph = tf.get_default_graph()
+2
+3 # to obtain a tensor from the saved model , we must
+get it by name , which is why we name the
+tensors when we create them
+4 # even if there is only one tensor with a name , in
+the meta and checkpoint files it is saved as
+an array , so we have to provide the index of
+the
+65 # tensor that we want to get -> thus we call "
+get_tensor_by_name(tensor_name:0)"
+66
+67 # obtain the input tensor by name
+68 X = graph.get_tensor_by_name(’X:0’)
+69 # obtain the output layer by name and apply
+softmax on in in order to obtain an output of
+probabilities
+70 softmax = tf.nn.softmax(graph.get_tensor_by_name(’
+out/out :0’))
+71
+72 image , height , width , depth = read_image(
+image_path , image_reader)
+73 coord = tf.train.Coordinator()
+74 threads = tf.train.start_queue_runners(sess=sess ,
+coord=coord)
+75 process_image(sess , X, softmax , image , height ,
+width , depth)
+76
+77 coord.request_stop()
+78 coord.join(threads)
+79 sess.close()
