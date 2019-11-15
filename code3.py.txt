@@ -1,0 +1,118 @@
+1 fruit_detection/detect_fruits.py
+2
+49
+3 import tensorflow as tf
+4 from utils import constants
+5
+6 with open(constants.root_dir + ’\\ utils \\ labels ’) as f
+:
+7 labels = f.readlines()
+8 labels = [x.strip() for x in labels]
+9 labels = ["nothing"] + labels
+10
+11 tf.app.flags.DEFINE_string(’image_path ’, ’images \\
+Lemon2.jpg ’, ’Path to image ’)
+12 FLAGS = tf.app.flags.FLAGS
+13
+14
+15 # load image
+16 def read_image(image_path , image_reader):
+17 filename_queue = tf.train.string_input_producer([
+image_path])
+18 _, image_file = image_reader.read(filename_queue)
+19 local_image = tf.image.decode_jpeg(image_file)
+20 local_image = tf.image.convert_image_dtype(
+local_image , tf.float32)
+21 gray_image = tf.image.rgb_to_grayscale(local_image
+)
+22 local_image = tf.image.rgb_to_hsv(local_image)
+23 shape = tf.shape(local_image)
+24 local_height = shape[0]
+25 local_width = shape[1]
+26 local_depth = shape[2]
+27 local_image = tf.reshape(local_image , [
+local_height , local_width , local_depth])
+28 final_image = tf.concat([local_image , gray_image],
+2)
+29 return final_image , local_height , local_width ,
+local_depth + 1
+30
+31
+32 def predict(sess , X, softmax , images):
+50
+33 images = sess.run(images)
+34 # the result of running this method is an array of
+probabilities , where each index in the array
+corresponds to a label
+35 probability = sess.run(softmax , feed_dict={X:
+images})
+36 # get the highest probability from the array and
+that should be the result
+37 prediction = sess.run(tf.argmax(probability , 1))
+38 return prediction , probability[0][prediction]
+39
+40
+41 def process_image(sess , X, softmax , image ,
+image_height , image_width , image_depth):
+42 image_depth = sess.run(image_depth)
+43 image_height = sess.run(image_height)
+44 image_width = sess.run(image_width)
+45 # resize the image to 100 x 100 pixels and shape
+it to be like an array of one image , since that
+is the required input for the network
+46 # for smaller parts of an image and feed those to
+the network , tensorflow has a method called "
+extract_image_patches"
+47 img = tf.image.resize_images(tf.reshape(image ,
+[-1, image_height , image_width , image_depth]),
+[100 , 100])
+48 img = tf.reshape(img, [-1, 100 * 100 * 4])
+49 rez, prob = predict(sess , X, softmax , img)
+50 print(’Label index: %d - Label: %s - Probability :
+%.4f’ % (rez, labels[rez[0]] , prob))
+51
+52
+53 with tf.Session() as sess:
+54 image_path = FLAGS.image_path
+55 image_reader = tf.WholeFileReader()
+56
+57 # restore the trained model from the saved
+checkpoint; provide the path to the meta file
+51
+58 saver = tf.train.import_meta_graph(constants.
+fruit_models_dir + ’model.ckpt.meta ’)
+59 # provide the path to the folder containing the
+checkpoints
+60 saver.restore(sess , tf.train.latest_checkpoint(
+constants.fruit_models_dir))
+61 graph = tf.get_default_graph()
+62
+63 # to obtain a tensor from the saved model , we must
+get it by name , which is why we name the
+tensors when we create them
+64 # even if there is only one tensor with a name , in
+the meta and checkpoint files it is saved as
+an array , so we have to provide the index of
+the
+65 # tensor that we want to get -> thus we call "
+get_tensor_by_name(tensor_name:0)"
+66
+67 # obtain the input tensor by name
+68 X = graph.get_tensor_by_name(’X:0’)
+69 # obtain the output layer by name and apply
+softmax on in in order to obtain an output of
+probabilities
+70 softmax = tf.nn.softmax(graph.get_tensor_by_name(’
+out/out :0’))
+71
+72 image , height , width , depth = read_image(
+image_path , image_reader)
+73 coord = tf.train.Coordinator()
+74 threads = tf.train.start_queue_runners(sess=sess ,
+coord=coord)
+75 process_image(sess , X, softmax , image , height ,
+width , depth)
+76
+77 coord.request_stop()
+78 coord.join(threads)
+79 sess.close()
