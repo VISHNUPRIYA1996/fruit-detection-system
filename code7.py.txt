@@ -1,0 +1,119 @@
+1 network/fruit_test_net.py
+2
+3 import numpy
+4 import tensorflow as tf
+5 import numpy as np
+6 import os
+7 import re
+8
+46
+9 from network_structure import fruit_network as network
+10 from network_structure import utils
+11 from utils import constants
+12
+13
+14 def setup_test_data():
+15 # create a map to add for each label the number of
+images that were labeled incorrectly
+16 mislabeled = {}
+17
+18 # associate the label number with the actual human
+readable label name
+19 with open(constants.root_dir + ’\\ utils \\ labels ’)
+as f:
+20 labels_text = f.readlines()
+21 labels_text = [x.strip() for x in labels_text]
+22 for label in labels_text:
+23 mislabeled[label] = 0
+24
+25 # class 0 is background class so it’s labeled as
+nothing
+26 labels_text = ["nothing"] + labels_text
+27
+28 return mislabeled , labels_text
+29
+30
+31 def build_dataset(filenames , batch_size):
+32 test_dataset = tf.data.TFRecordDataset(filenames)
+33 test_dataset = test_dataset.map(utils.
+parse_single_example).map(lambda image , label:
+(utils.build_hsv_grayscale_image(image), label)
+)
+34 test_dataset = test_dataset.batch(batch_size)
+35 return test_dataset
+36
+37
+38 def test_model(sess , pred , iterator , total_images ,
+file_name):
+47
+39 images_left_to_process = total_images
+40 total_number_of_images = total_images
+41 images_with_labels = iterator.get_next()
+42 correct = 0
+43 while True:
+44 try:
+45 batch_x , batch_y = sess.run(
+images_with_labels)
+46 batch_x = np.reshape(batch_x , [-1, network
+.input_size])
+47 # the results of the classification is an
+array of 1 and 0, 1 is a correct
+classification
+48 results = sess.run(pred , feed_dict={
+network.X: batch_x , network.Y: batch_y
+})
+49 images_left_to_process =
+images_left_to_process - len(results)
+50 for i in range(len(results)):
+51 if not results[i]:
+52 mislabeled[labels_text[batch_y[i
+]]] += 1
+53
+54 correct = correct + numpy.sum(results)
+55 print(" Predicted %d out of %d; partial
+accuracy %.4f" % (correct ,
+total_number_of_images -
+images_left_to_process , correct / (
+total_number_of_images -
+images_left_to_process)))
+56 except tf.errors.OutOfRangeError:
+57 break
+58 print("Final accuracy on %s data: %.8f" % (
+file_name , correct / total_number_of_images))
+59
+60
+61 if __name__ == ’__main__ ’:
+62
+48
+63 with tf.Session() as sess:
+64 useTrain = False
+65 if useTrain:
+66 file_name = ’train ’
+67 total_images = constants.
+number_train_images
+68 else:
+69 file_name = ’test ’
+70 total_images = constants.
+number_test_images
+71
+72 mislabeled , labels_text = setup_test_data()
+73 _, _, prediction = network.build_model()
+74 init = tf.global_variables_initializer()
+75
+76 saver = tf.train.Saver()
+77 sess.run(init)
+78 tfrecords_files = [(constants.data_dir + f)
+for f in os.listdir(constants.data_dir) if
+re.match(file_name , f)]
+79 dataset = build_dataset(tfrecords_files ,
+network.batch_size)
+80 iterator = dataset.make_one_shot_iterator()
+81 ckpt = tf.train.get_checkpoint_state(constants
+.fruit_models_dir)
+82 saver.restore(sess , ckpt.model_checkpoint_path
+)
+83 test_model(sess , prediction , iterator ,
+total_images , file_name)
+84 print(mislabeled)
+85
+86 sess.close()
